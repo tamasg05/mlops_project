@@ -135,8 +135,10 @@ class MLPersist:
         
         knn = self.load_artifact(MLPersist.MODEL_FOLDER + MLPersist.KNN_MODEL)
         y = knn.predict(df)
+
+        predictions_df = pd.DataFrame(y, columns=['prediction'])
         
-        return y
+        return predictions_df
 
     def test_predict(self, df_transformed: pd.DataFrame) -> Tuple[float, float]:
         y = df_transformed["survived"]
