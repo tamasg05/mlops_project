@@ -1,0 +1,15 @@
+artifact_uri: mlflow-artifacts:/0/0c4d5643751944dcb64436b83ca1f32d/artifacts
+end_time: 1748961703279
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 0c4d5643751944dcb64436b83ca1f32d
+run_name: bold-fish-138
+run_uuid: 0c4d5643751944dcb64436b83ca1f32d
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1748961697645
+status: 4
+tags: []
+user_id: gallit

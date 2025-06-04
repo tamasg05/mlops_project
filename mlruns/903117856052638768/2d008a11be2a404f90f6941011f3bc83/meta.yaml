@@ -1,0 +1,16 @@
+artifact_uri: mlflow-artifacts:/903117856052638768/2d008a11be2a404f90f6941011f3bc83/artifacts
+deleted_time: 1749048664668
+end_time: 1748963234436
+entry_point_name: ''
+experiment_id: '903117856052638768'
+lifecycle_stage: deleted
+run_id: 2d008a11be2a404f90f6941011f3bc83
+run_name: colorful-stork-562
+run_uuid: 2d008a11be2a404f90f6941011f3bc83
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1748963229087
+status: 3
+tags: []
+user_id: gallit

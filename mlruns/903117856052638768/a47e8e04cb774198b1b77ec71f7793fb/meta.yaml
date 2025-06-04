@@ -1,0 +1,15 @@
+artifact_uri: mlflow-artifacts:/903117856052638768/a47e8e04cb774198b1b77ec71f7793fb/artifacts
+end_time: 1748963710707
+entry_point_name: ''
+experiment_id: '903117856052638768'
+lifecycle_stage: active
+run_id: a47e8e04cb774198b1b77ec71f7793fb
+run_name: train_20250603_171504
+run_uuid: a47e8e04cb774198b1b77ec71f7793fb
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1748963704940
+status: 3
+tags: []
+user_id: gallit

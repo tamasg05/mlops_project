@@ -1,0 +1,15 @@
+artifact_uri: mlflow-artifacts:/0/98cf1eb0ac5c4a2c9db9f4f73639769e/artifacts
+end_time: 1748961961376
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 98cf1eb0ac5c4a2c9db9f4f73639769e
+run_name: indecisive-wolf-965
+run_uuid: 98cf1eb0ac5c4a2c9db9f4f73639769e
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1748961953979
+status: 3
+tags: []
+user_id: gallit

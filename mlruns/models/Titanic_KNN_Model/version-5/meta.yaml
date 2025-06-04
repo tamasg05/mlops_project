@@ -1,0 +1,14 @@
+aliases: []
+creation_timestamp: 1749048559704
+current_stage: Production
+description: ''
+last_updated_timestamp: 1749048559738
+name: Titanic_KNN_Model
+run_id: ade28f108de24def9d08d5178a49a01e
+run_link: ''
+source: mlflow-artifacts:/903117856052638768/ade28f108de24def9d08d5178a49a01e/artifacts/knn_model
+status: READY
+status_message: null
+storage_location: mlflow-artifacts:/903117856052638768/ade28f108de24def9d08d5178a49a01e/artifacts/knn_model
+user_id: null
+version: 5
