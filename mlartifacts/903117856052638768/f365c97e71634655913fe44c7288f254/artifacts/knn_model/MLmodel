@@ -1,0 +1,35 @@
+artifact_path: knn_model
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.11.9
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.6.1
+is_signature_from_type_hint: false
+mlflow_version: 2.22.0
+model_size_bytes: 43877
+model_uuid: 30736f906d704a35affd2ee6801f5a62
+prompts: null
+run_id: f365c97e71634655913fe44c7288f254
+signature:
+  inputs: '[{"type": "long", "name": "pclass", "required": true}, {"type": "long",
+    "name": "adult_male", "required": true}, {"type": "long", "name": "alone", "required":
+    true}, {"type": "double", "name": "fare", "required": true}, {"type": "boolean",
+    "name": "deck_A", "required": true}, {"type": "boolean", "name": "deck_B", "required":
+    true}, {"type": "boolean", "name": "deck_C", "required": true}, {"type": "boolean",
+    "name": "deck_D", "required": true}, {"type": "boolean", "name": "deck_E", "required":
+    true}, {"type": "boolean", "name": "deck_F", "required": true}, {"type": "boolean",
+    "name": "deck_G", "required": true}, {"type": "boolean", "name": "deck_None",
+    "required": true}]'
+  outputs: '[{"type": "long", "name": "survived", "required": true}]'
+  params: null
+type_hint_from_example: false
+utc_time_created: '2025-06-04 13:39:56.815375'

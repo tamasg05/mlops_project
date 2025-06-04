@@ -1,0 +1,6 @@
+artifact_location: mlflow-artifacts:/903117856052638768
+creation_time: 1748963219733
+experiment_id: '903117856052638768'
+last_update_time: 1748963219733
+lifecycle_stage: active
+name: Titanic KNN classification tests
