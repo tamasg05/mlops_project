@@ -1,0 +1,14 @@
+aliases: []
+creation_timestamp: 1749745098268
+current_stage: None
+description: ''
+last_updated_timestamp: 1749745098268
+name: Titanic_KNN_Model
+run_id: 063b539ede4e4e43bfff802ce0949b77
+run_link: ''
+source: runs:/063b539ede4e4e43bfff802ce0949b77/knn_model
+status: READY
+status_message: null
+storage_location: runs:/063b539ede4e4e43bfff802ce0949b77/knn_model
+user_id: null
+version: 46
