@@ -3,7 +3,7 @@ import pandas as pd
 import io
 from MLPersist import MLPersist
 
-CSV_DATA = "titanic.pkl"
+
 app = Flask(__name__)
 persist = MLPersist()
 train_accuracy = 0

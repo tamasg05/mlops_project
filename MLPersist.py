@@ -2,7 +2,6 @@ import pickle
 import pandas as pd
 import mlflow
 import mlflow.sklearn
-from mlflow.exceptions import MlflowException
 from mlflow.entities.model_registry import ModelVersion
 from mlflow.data.pandas_dataset import PandasDataset
 
@@ -42,7 +41,8 @@ class MLPersist:
             Path(MLPersist.MODEL_FOLDER).mkdir(parents=True, exist_ok=True)
 
     
-    def save_artifact(self, df, neighbours, train_accuracy, test_accuracy, X_train, y_train, knn, save_threshold, label_encoder_path) -> None:
+    def save_artifact(self, df: pd.DataFrame, neighbours: int, train_accuracy: float, test_accuracy: float, 
+                      X_train: pd.DataFrame, y_train: pd.DataFrame, knn: KNeighborsClassifier, save_threshold: float, label_encoder_path: str) -> None:
         # saving the training data, so that we could log the data set as an artifact
         train_data_path = os.path.join(self.MODEL_FOLDER, "training_data.csv")
         df.to_csv(train_data_path, index=False) 
@@ -78,29 +78,29 @@ class MLPersist:
                 model_uri = f"runs:/{run.info.run_id}/knn_model"
                 mlflow_client = mlflow.tracking.MlflowClient()            
 
-                mversion = mlflow_client.create_model_version(MLPersist.MLFLOW_NAME, 
+                model_version = mlflow_client.create_model_version(MLPersist.MLFLOW_NAME, 
                                                               model_uri, 
                                                               run.info.run_id)
-                print(f"mversion.version={mversion.version}")
+                print(f"model_version.version={model_version.version}")
 
                 if test_accuracy > save_threshold:                                                    
                     # Set registered model alias for staging and test
                     mlflow_client.set_registered_model_alias(MLPersist.MLFLOW_NAME, 
                                                              MLPersist.MLFLOW_ALIAS_TEST, 
-                                                             mversion.version)
+                                                             model_version.version)
 
                     mlflow_client.set_registered_model_alias(name=MLPersist.MLFLOW_NAME,
                                                              alias=MLPersist.MLFLOW_ALIAS_STAGING,
-                                                             version=mversion.version)
-                    print(f"MLflow: Model Name: {MLPersist.MLFLOW_NAME}, Model Version: {mversion.version} registered and aliased: '{MLPersist.MLFLOW_ALIAS_STAGING}'.")               
+                                                             version=model_version.version)
+                    print(f"MLflow: Model Name: {MLPersist.MLFLOW_NAME}, Model Version: {model_version.version} registered and aliased: '{MLPersist.MLFLOW_ALIAS_STAGING}'.")               
                     print("MLflow: Trained model saved.")
                 else:
                     # Set registered model alias for test only
                     mlflow_client.set_registered_model_alias(MLPersist.MLFLOW_NAME, 
                                                              MLPersist.MLFLOW_ALIAS_TEST, 
-                                                             mversion.version)
+                                                             model_version.version)
 
-                    print(f"MLflow: Model Name: {MLPersist.MLFLOW_NAME}, Model Version: {mversion.version} registered and aliased: '{MLPersist.MLFLOW_ALIAS_TEST}'.")               
+                    print(f"MLflow: Model Name: {MLPersist.MLFLOW_NAME}, Model Version: {model_version.version} registered and aliased: '{MLPersist.MLFLOW_ALIAS_TEST}'.")               
                     print("MLflow: Trained model saved.")
                     
 
