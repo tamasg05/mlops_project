@@ -1,0 +1,16 @@
+# Python virtual environment
+.venv/
+
+# Python cache directories
+__pycache__/
+*.pyc
+
+# MLflow artifacts and local tracking data
+mlruns/
+mlartifacts/
+
+# IDE specific files
+.vscode/
+
+# Other files to exclude from versioning
+*.log
