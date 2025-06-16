@@ -1,40 +1,53 @@
-from flask import Flask
-from flask_restx import Api, Resource, reqparse
-from werkzeug.datastructures import FileStorage
+from flask import Flask, request, jsonify
 import pandas as pd
 import io
+from MLPersist import MLPersist
 
+CSV_DATA = "titanic.pkl"
 app = Flask(__name__)
+persist = MLPersist()
+train_accuracy = 0
+test_accuracy = 0
 
-# For OpenAPI
-api = Api(app, version='1.0', title='CSV Upload API',
-          description='A simple API to upload and process CSV files')
+@app.route('/train_csv', methods=['POST'])
+def train_csv():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+    if file and file.filename.endswith('.csv'):
+        try:
+            csv_data = file.read().decode('utf-8')
+            df = pd.read_csv(io.StringIO(csv_data))
+            persist.save_artifact(df, persist.MODEL_FOLDER + CSV_DATA)
 
-ns = api.namespace('upload', description='CSV file upload operations')
+            global train_accuracy, test_accuracy
+            _, train_accuracy, test_accuracy = persist.train_pipeline(df.copy(), test_accuracy)
 
-upload_parser = reqparse.RequestParser()
-upload_parser.add_argument('file', type=FileStorage, location='files', required=True, help='The CSV file to upload')
+            return jsonify({'success': True, 'message':'Model trained', 'test accuracy': test_accuracy})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    return jsonify({'error': 'Invalid file'}), 400
 
-# OpeanAPI end point on http://127.0.0.1:5000/upload/csv/
-@ns.route('/csv')
-class CSVUpload(Resource):
+@app.route('/predict_csv', methods=['POST'])
+def predict_csv():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+    if file and file.filename.endswith('.csv'):
+        try:
+            csv_data = file.read().decode('utf-8')
+            df = pd.read_csv(io.StringIO(csv_data))
+            df_t = persist.preprocess_pipeline(df.copy())
+            y = persist.predict(df_t)
 
-    @ns.expect(upload_parser)
-    def post(self):
-        args = upload_parser.parse_args()
-
-        file = args['file']
-        if file and file.filename.endswith('.csv'):
-            try:
-                csv_data = file.read().decode('utf-8')
-                df = pd.read_csv(io.StringIO(csv_data))
-                result = {'message': 'CSV file uploaded and processed successfully',
-                          'row_count': len(df),
-                          'columns': df.columns.tolist()}
-                return result, 200
-            except Exception as e:
-                return {'error': f'Error processing CSV file: {str(e)}'}, 500
-        return {'error': 'Invalid file format. Only CSV files are allowed'}, 400
+            return jsonify({'success': True, 'predictions': y.to_dict(orient='records')})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    return jsonify({'error': 'Invalid file'}), 400
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5000)

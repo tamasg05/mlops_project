@@ -21,11 +21,11 @@ class MLPersist:
         else:
             Path(MLPersist.MODEL_FOLDER).mkdir(parents=True, exist_ok=True)
 
-    def save_artifact(self, artifact, file_path) -> None:
+    def save_artifact(self, artifact: any, file_path: str) -> None:
         with open(file_path, 'wb') as file:
             pickle.dump(artifact, file)
 
-    def load_artifact(self, file_path) -> any:
+    def load_artifact(self, file_path: str) -> any:
         with open(file_path, 'rb') as file:
             artifact = pickle.load(file)
         return artifact
@@ -45,7 +45,7 @@ class MLPersist:
 
         return df
 
-    def transfrom_data(self, df: pd.DataFrame, saveEncoders=True) -> pd.DataFrame:
+    def transform_data(self, df: pd.DataFrame, saveEncoders=True) -> pd.DataFrame:
         # encoding the "Deck" column
         col = 'deck'
         transformed_as_df = pd.get_dummies(df[col])
@@ -89,7 +89,7 @@ class MLPersist:
     
         print (f"save_threshold= {save_threshold}")
         df = self.cleaning_dataframe(df)
-        df = self.transfrom_data(df)
+        df = self.transform_data(df)
         df = self.select_features(df)
         df = self.scale_features(df)
 
@@ -119,7 +119,7 @@ class MLPersist:
 
     def preprocess_pipeline(self, df: pd.DataFrame) -> pd.DataFrame:
         df = self.cleaning_dataframe(df)
-        df = self.transfrom_data(df, saveEncoders=False)
+        df = self.transform_data(df, saveEncoders=False)
         df = self.select_features(df, full=False)
         df = self.scale_features(df)
 
