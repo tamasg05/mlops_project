@@ -18,7 +18,6 @@ from typing import Optional, Tuple, Dict
 from datetime import datetime
 from pathlib import Path
 
-
 class MLPersist:
     MODEL_FOLDER = "artifacts/"
     LABEL_ENCODER = "label_encoder_dict.pkl"
@@ -67,8 +66,7 @@ class MLPersist:
                 
                 # logging training data set to appear on the first page in MLFlow under the experiment
                 # it only shows the data types and dimensions etc. but not the data themselves
-                dataset: PandasDataset = mlflow.data.from_pandas(df, source=train_data_path)
-                mlflow.log_input(dataset, context="Training") 
+                mlflow.log_input(mlflow.data.from_pandas(df), context="training")
 
                 # also logging here to make the data easily downloadable with the other artifacts
                 mlflow.log_artifact(train_data_path, artifact_path="training_data")
