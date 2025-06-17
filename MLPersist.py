@@ -6,6 +6,7 @@ from mlflow.entities.model_registry import ModelVersion
 from mlflow.data.pandas_dataset import PandasDataset
 
 
+
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
@@ -47,6 +48,14 @@ class MLPersist:
         train_data_path = os.path.join(self.MODEL_FOLDER, "training_data.csv")
         df.to_csv(train_data_path, index=False) 
         print(f"Temporary training data saved to: {train_data_path}")
+        
+        mlflow_client = mlflow.tracking.MlflowClient()            
+
+        # check whether the model exists in MLFlow to avoid error when creating a new version of the model
+        try:
+            mlflow_client.get_registered_model(name=MLPersist.MLFLOW_NAME)
+        except mlflow.exceptions.RestException:
+            mlflow_client.create_registered_model(name=MLPersist.MLFLOW_NAME)
 
         try:
             # Setting a unique name for the run
@@ -68,7 +77,6 @@ class MLPersist:
                 mlflow.log_artifact(label_encoder_path, artifact_path=MLPersist.LABEL_ENCODER_FOLDER)
 
                 # setting the input data shapes
-                # TODO convert int columns to float to avoid the possible NaN waring in MLFlow, anyway they are here never NaN
                 signature = mlflow.models.infer_signature(X_train, y_train)
 
 
@@ -76,8 +84,7 @@ class MLPersist:
                                         artifact_path="knn_model",
                                         signature=signature)
                 model_uri = f"runs:/{run.info.run_id}/knn_model"
-                mlflow_client = mlflow.tracking.MlflowClient()            
-
+                
                 model_version = mlflow_client.create_model_version(MLPersist.MLFLOW_NAME, 
                                                               model_uri, 
                                                               run.info.run_id)
@@ -108,6 +115,7 @@ class MLPersist:
 
         except Exception as e:
             print(f"Failed saving the model with the exception: {str(e)}")
+            raise # to see stack trace
             
     def save_artifact_to_disk(self, artifact: any, file_path: str) -> None:
         with open(file_path, 'wb') as file:
