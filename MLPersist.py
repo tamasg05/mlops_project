@@ -254,7 +254,7 @@ class MLPersist:
 
     def predict(self, df: pd.DataFrame) -> Optional[pd.DataFrame]:
         try:
-            model_uri = f"models:/{MLPersist.MLFLOW_NAME}/{MLPersist.MLFLOW_ALIAS_STAGING}"
+            model_uri = f"models:/{MLPersist.MLFLOW_NAME}@{MLPersist.MLFLOW_ALIAS_STAGING}"
             loaded_model = mlflow.sklearn.load_model(model_uri) 
  
             print(loaded_model)
