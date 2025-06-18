@@ -30,8 +30,8 @@ class MLPersist:
     MLFLOW_ALIAS_PRODUCTION = "Production"
     MLFLOW_ALIAS_TEST = "Test"
 
-
-    mlflow.set_tracking_uri("http://localhost:5000")
+    # replace it with your IP if this does not work for localhost that runs docker
+    mlflow.set_tracking_uri("http://host.docker.internal:5000")
     mlflow.set_experiment("Titanic KNN classification tests")
 
     def __init__(self):

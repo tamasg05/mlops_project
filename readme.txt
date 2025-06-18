@@ -52,6 +52,13 @@ There are 3 git branches with different functionalities:
                 -Experiments
                 -Saving parameters, metrics and artifacts
                 -Model registration and aliasing
-    (3) feature/mlflow_docker
+    (3) feature/dockerized
         this branch contains a the application from feature/mlflow containerized that can be deployed in any docker compatible environment
-        
+        -You maybe have to change MLFlow's URL and port in MLPersist.py depending where you MLFlow runs.
+            This points to the localhost that runs the docker container:
+            mlflow.set_tracking_uri("http://host.docker.internal:5000")
+        -Build (you need docker):
+            docker build -t titanic-api .
+
+        -To map the container port to the host port for the REST application
+            docker run -p 5001:5001 titanic-api
