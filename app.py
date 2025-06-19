@@ -42,6 +42,8 @@ def predict_csv():
             df = pd.read_csv(io.StringIO(csv_data))
             df_t = persist.preprocess_pipeline(df.copy())
             y = persist.predict(df_t)
+            if y is None:
+                return jsonify({'error': 'The model is not available. Train the model first.'}), 400
 
             return jsonify({'success': True, 'predictions': y.to_dict(orient='records')})
         except Exception as e:
@@ -49,4 +51,5 @@ def predict_csv():
     return jsonify({'error': 'Invalid file'}), 400
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    # host="0.0.0.0" to listen on all interfaces
+    app.run(debug=True, host="0.0.0.0", port=5001)
