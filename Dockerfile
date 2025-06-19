@@ -7,6 +7,8 @@ WORKDIR /app
 # Install system dependencies (if needed)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files

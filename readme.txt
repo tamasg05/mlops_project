@@ -56,9 +56,16 @@ There are 3 git branches with different functionalities:
         this branch contains a the application from feature/mlflow containerized that can be deployed in any docker compatible environment
         -You maybe have to change MLFlow's URL and port in MLPersist.py depending where you MLFlow runs.
             This points to the localhost that runs the docker container:
-            mlflow.set_tracking_uri("http://host.docker.internal:5000")
+            mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"))
+            Set the following environment variable to get to an MLFlow server running on your host outside the docker container:
+            MLFLOW_TRACKING_URI=http://host.docker.internal:5000 
+            
         -Build (you need docker):
-            docker build -t titanic-api .
+            docker build -t titanic-app .
 
-        -To map the container port to the host port for the REST application
-            docker run -p 5001:5001 titanic-api
+        -start mlflow ui on the machine hosting the docker container so that the REST application can start up
+         if you have it elsewhere, set the MLFLOW_TRACKING_URI appropriately when starting the docker container
+
+        -Start the application and create the docker container
+             the 5001 port is mapped to the host port for the REST application
+             docker run -it --rm -p 5001:5001 --name titanic-app-container --env MLFLOW_TRACKING_URI=http://host.docker.internal:5000 titanic-app

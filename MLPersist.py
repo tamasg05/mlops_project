@@ -17,6 +17,7 @@ import os
 from typing import Optional, Tuple, Dict
 from datetime import datetime
 from pathlib import Path
+import os
 
 class MLPersist:
     MODEL_FOLDER = "artifacts/"
@@ -31,8 +32,12 @@ class MLPersist:
     MLFLOW_ALIAS_TEST = "Test"
 
     # replace it with your IP if this does not work for localhost that runs docker
-    mlflow.set_tracking_uri("http://host.docker.internal:5000")
-    mlflow.set_experiment("Titanic KNN classification tests")
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"))
+    experiment_name = "Titanic KNN classification tests"
+    experiment = mlflow.get_experiment_by_name(experiment_name)
+    if experiment is None:
+        mlflow.create_experiment(experiment_name)
+    mlflow.set_experiment(experiment_name)
 
     def __init__(self):
         if os.path.exists(MLPersist.MODEL_FOLDER):
@@ -262,7 +267,7 @@ class MLPersist:
             predictions_df = pd.DataFrame(y, columns=['prediction'], index=df.index)
             return predictions_df
         except Exception as e:
-            print(f"MLflow: Error loading model: {e}")
+            print(f"The model has probably not yet been trained. Train the model first! MLflow: Error loading model: {e}")
             return None
 
     def test_predict(self, df_transformed: pd.DataFrame) -> Tuple[float, float]:

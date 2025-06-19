@@ -1,8 +1,8 @@
 __pycache__/
 *.pyc
 *.pkl
-*.csv
 .venv/
 mlruns/
 mlartifacts/
 artifacts/
+train_pipeline.py

@@ -16,3 +16,4 @@ mlartifacts/
 # Other files to exclude from versioning
 *.log
 artifacts/
+mlflow.db
