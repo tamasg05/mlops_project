@@ -25,7 +25,7 @@ How to run the application:
     curl -X POST -F "file=@titanic_train500.csv" http://127.0.0.1:5001/train_csv
     curl -X POST -F "file=@titanic_pred200.csv" http://127.0.0.1:5001/predict_csv 
 
-There are 3 git branches with different functionalities:
+There are 4 git branches with different functionalities:
     (1) feature/simple
         this branch is the simplest approach just for training a model and storing it on the file system, 
         the prediction pipeline will use the model saved during the training. There is no model versioning, 
@@ -61,6 +61,7 @@ There are 3 git branches with different functionalities:
             MLFLOW_TRACKING_URI=http://host.docker.internal:5000 
             
         -Build (you need docker):
+            execute the following command in your project folder:
             docker build -t titanic-app .
 
         -start mlflow ui on the machine hosting the docker container so that the REST application can start up
@@ -69,3 +70,13 @@ There are 3 git branches with different functionalities:
         -Start the application and create the docker container
              the 5001 port is mapped to the host port for the REST application
              docker run -it --rm -p 5001:5001 --name titanic-app-container --env MLFLOW_TRACKING_URI=http://host.docker.internal:5000 titanic-app
+
+        -Test the application with curl as introduced above
+            -Run the commands on your localhost, e.g.:
+            curl -X POST -F "file=@titanic_train500.csv" http://127.0.0.1:5001/train_csv
+            the docker container will listen on the local 5001 port and the application will serve the request
+
+    (4) main
+        this branch contains the dockerized variant of the application and MLFlow is updated from 2.22.0 to 3.1.0 version. This upgrade required a couple of changes in the code.
+
+        
