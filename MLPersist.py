@@ -1,82 +1,79 @@
+import os
 import pickle
+from datetime import datetime
+from pathlib import Path
+from typing import Optional, Tuple, Dict
+
 import pandas as pd
 import mlflow
 import mlflow.sklearn
-from mlflow.entities.model_registry import ModelVersion
-from mlflow.data.pandas_dataset import PandasDataset
-
-
-
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import MinMaxScaler, LabelEncoder
 from sklearn.neighbors import KNeighborsClassifier
 
-import os
-from typing import Optional, Tuple, Dict
-from datetime import datetime
-from pathlib import Path
-import os
 
 class MLPersist:
     MODEL_FOLDER = "artifacts/"
     LABEL_ENCODER = "label_encoder_dict.pkl"
     LABEL_ENCODER_FOLDER = "label_encoder_dictionary"
-    KNN_MODEL = "knn_classifier.pkl"
-
     MLFLOW_NAME = "Titanic_KNN_Model"
 
     MLFLOW_ALIAS_STAGING = "Staging"
     MLFLOW_ALIAS_PRODUCTION = "Production"
     MLFLOW_ALIAS_TEST = "Test"
 
-    # replace it with your IP if this does not work for localhost that runs docker
-    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"))
-    experiment_name = "Titanic KNN classification tests"
-    experiment = mlflow.get_experiment_by_name(experiment_name)
-    if experiment is None:
-        mlflow.create_experiment(experiment_name)
-    mlflow.set_experiment(experiment_name)
-
     def __init__(self):
+        # Set up MLflow tracking
+        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"))
+        experiment_name = "Titanic KNN classification tests"
+        experiment = mlflow.get_experiment_by_name(experiment_name)
+        if experiment is None:
+            mlflow.create_experiment(experiment_name)
+        mlflow.set_experiment(experiment_name)
+
+        # Ensure artifact folder exists
         if os.path.exists(MLPersist.MODEL_FOLDER):
-            print(MLPersist.MODEL_FOLDER + " exists.")
+            print(f"{MLPersist.MODEL_FOLDER} exists.")
         else:
             Path(MLPersist.MODEL_FOLDER).mkdir(parents=True, exist_ok=True)
 
-    
-    def save_artifact(self, df: pd.DataFrame, neighbours: int, train_accuracy: float, test_accuracy: float, 
-                    X_train: pd.DataFrame, y_train: pd.DataFrame, knn: KNeighborsClassifier, save_threshold: float, label_encoder_path: str) -> None:
-        # saving the training data, so that we could log the data set as an artifact
+    def save_artifact(
+        self,
+        df: pd.DataFrame,
+        neighbours: int,
+        train_accuracy: float,
+        test_accuracy: float,
+        X_train: pd.DataFrame,
+        y_train: pd.DataFrame,
+        knn: KNeighborsClassifier,
+        save_threshold: float,
+        label_encoder_path: str
+    ) -> None:
+        """Save the model, encoders, and training data as MLflow artifacts."""
         train_data_path = os.path.join(self.MODEL_FOLDER, "training_data.csv")
-        df.to_csv(train_data_path, index=False) 
+        df.to_csv(train_data_path, index=False)
         print(f"Temporary training data saved to: {train_data_path}")
-        
-        mlflow_client = mlflow.tracking.MlflowClient()            
 
-        # check whether the model exists in MLflow registry, if not create it
+        mlflow_client = mlflow.tracking.MlflowClient()
+
+        # Ensure model exists in registry
         try:
             mlflow_client.get_registered_model(name=MLPersist.MLFLOW_NAME)
         except mlflow.exceptions.RestException:
             mlflow_client.create_registered_model(name=MLPersist.MLFLOW_NAME)
 
         try:
-            rname = f"train_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            with mlflow.start_run(run_name=rname) as run:
+            run_name = f"train_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            with mlflow.start_run(run_name=run_name) as run:
                 mlflow.log_param("Neighbors for KNN", neighbours)
                 mlflow.log_metric("train_accuracy", train_accuracy)
                 mlflow.log_metric("test_accuracy", test_accuracy)
 
-                # logging training dataset schema (metadata only)
                 mlflow.log_input(mlflow.data.from_pandas(df), context="training")
-
-                # save raw training dataset
                 mlflow.log_artifact(train_data_path, artifact_path="training_data")
-
-                # save label encoder
                 mlflow.log_artifact(label_encoder_path, artifact_path=MLPersist.LABEL_ENCODER_FOLDER)
-                # setting the input data shapes
+
                 signature = mlflow.models.infer_signature(X_train, y_train)
                 input_example = X_train.head(1)
 
@@ -98,25 +95,17 @@ class MLPersist:
             version = versions[0].version
 
             if test_accuracy > save_threshold:
-                # Set registered model aliases for staging and test
-                mlflow_client.set_registered_model_alias(
-                    MLPersist.MLFLOW_NAME, MLPersist.MLFLOW_ALIAS_TEST, version
-                )
-                mlflow_client.set_registered_model_alias(
-                    MLPersist.MLFLOW_NAME, MLPersist.MLFLOW_ALIAS_STAGING, version
-                )
+                mlflow_client.set_registered_model_alias(MLPersist.MLFLOW_NAME, MLPersist.MLFLOW_ALIAS_TEST, version)
+                mlflow_client.set_registered_model_alias(MLPersist.MLFLOW_NAME, MLPersist.MLFLOW_ALIAS_STAGING, version)
                 print(f"Model v{version} aliased as Staging and Test.")
             else:
-                # Set registered model alias for test only
-                mlflow_client.set_registered_model_alias(
-                    MLPersist.MLFLOW_NAME, MLPersist.MLFLOW_ALIAS_TEST, version
-                )
+                mlflow_client.set_registered_model_alias(MLPersist.MLFLOW_NAME, MLPersist.MLFLOW_ALIAS_TEST, version)
                 print(f"Model v{version} aliased as Test only.")
 
             print(f"Train accuracy: {train_accuracy}, Test Accuracy: {test_accuracy}")
 
         except Exception as e:
-            print(f"Failed saving the model with the exception: {str(e)}")
+            print(f"Failed saving the model: {e}")
             raise
 
     def save_artifact_to_disk(self, artifact: any, file_path: str) -> None:
@@ -125,94 +114,86 @@ class MLPersist:
 
     def load_artifact_from_disk(self, file_path: str) -> any:
         with open(file_path, 'rb') as file:
-            artifact = pickle.load(file)
-        return artifact
-        
+            return pickle.load(file)
+
     def load_label_encoders(self, alias: str) -> Dict[str, LabelEncoder]:
+        """Load label encoders from MLflow by alias."""
         try:
-            name = MLPersist.MLFLOW_NAME
             client = mlflow.tracking.MlflowClient()
-
             # Get model version associated with alias
-            model_version = client.get_model_version_by_alias(name=name, alias=alias)
-            run_id = model_version.run_id  # Valid in MLflow 3.1.0
-
-            # Reconstruct artifact URI based on run ID
-            artifact_uri = f"runs:/{run_id}/{MLPersist.LABEL_ENCODER_FOLDER}/{MLPersist.LABEL_ENCODER}"
+            model_version = client.get_model_version_by_alias(name=self.MLFLOW_NAME, alias=alias)
+            run_id = model_version.run_id
+            artifact_uri = f"runs:/{run_id}/{self.LABEL_ENCODER_FOLDER}/{self.LABEL_ENCODER}"
             print(f"Loading label encoders from MLflow URI: {artifact_uri}")
 
             local_path = mlflow.artifacts.download_artifacts(artifact_uri=artifact_uri)
             with open(local_path, 'rb') as f:
-                label_encoders = pickle.load(f)
-
-            return label_encoders
-
+                return pickle.load(f)
         except Exception as e:
             print(f"Failed to load label encoders from MLflow: {e}")
             raise
 
-
     def cleaning_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
-        # converting deck to category type
+        """Fill or drop missing values and clean up column types."""
         df['deck'] = df['deck'].astype('category')
+        df['deck'] = df['deck'].cat.add_categories("None").fillna("None")
+        df['age'] = df['age'].fillna(df['age'].median())
+        return df.dropna()
 
-        # replacing NAs in column Deck
-        df['deck'] = df["deck"].cat.add_categories("None").fillna("None")
+    def transform_data(
+        self,
+        df: pd.DataFrame,
+        alias: str = MLFLOW_ALIAS_STAGING,
+        save_encoders: bool = True
+    ) -> Tuple[pd.DataFrame, str]:
+        """One-hot and label encode columns. Optionally save/load encoders."""
 
-        # replacing NAs with the median age in column Age
-        df['age'] = df["age"].fillna(df['age'].median())
-
-        # dropping the remaining rows with NAs
-        df = df.dropna()
-
-        return df
-
-    def transform_data(self, df: pd.DataFrame, alias=MLFLOW_ALIAS_STAGING, saveEncoders=True) -> Tuple[pd.DataFrame, str]:
         # encoding the "Deck" column
-        col = 'deck'
-        transformed_as_df = pd.get_dummies(df[col])
-        coded_column_names = [col + "_" + column for column in transformed_as_df.columns]
-        transformed_as_df.columns = coded_column_names
-
+        transformed_as_df = pd.get_dummies(df['deck'])
+        transformed_as_df.columns = [f"deck_{col}" for col in transformed_as_df.columns]
         df = pd.concat([df, transformed_as_df], axis=1)
 
-        local_label_encoder_path = MLPersist.MODEL_FOLDER + MLPersist.LABEL_ENCODER
-        # encoding adult_male and alone columns    
-        if saveEncoders: 
-            label_encoders = {}
+        encoder_path = self.MODEL_FOLDER + self.LABEL_ENCODER
+
+        # encoding adult_male and alone columns
+        if save_encoders:
+            encoders = {}
             for col in ["adult_male", "alone"]:
-                label_encoders[col] = LabelEncoder()
-                df[col] = label_encoders[col].fit_transform(df[col])
-            
-            self.save_artifact_to_disk(label_encoders, local_label_encoder_path)
+                encoders[col] = LabelEncoder()
+                df[col] = encoders[col].fit_transform(df[col])
+            self.save_artifact_to_disk(encoders, encoder_path)
         else:
-            label_encoders = self.load_label_encoders(MLPersist.MLFLOW_ALIAS_STAGING)
+            encoders = self.load_label_encoders(alias)
             for col in ["adult_male", "alone"]:
-                df[col] = label_encoders[col].transform(df[col])
+                df[col] = encoders[col].transform(df[col])
 
-        return (df, local_label_encoder_path)
+        return df, encoder_path
 
-    def select_features(self, df: pd.DataFrame, full=True) -> pd.DataFrame:
+    def select_features(self, df: pd.DataFrame, full: bool = True) -> pd.DataFrame:
+        features = [
+            'pclass', 'adult_male', 'alone', 'fare',
+            'deck_A', 'deck_B', 'deck_C', 'deck_D', 'deck_E',
+            'deck_F', 'deck_G', 'deck_None'
+        ]
         if full:
-            features = ['pclass', 'adult_male', 'alone', 'fare', 'deck_A', 'deck_B', 'deck_C', 'deck_D', 'deck_E', 'deck_F', 'deck_G', 'deck_None', 'survived']
-        else:
-            features = ['pclass', 'adult_male', 'alone', 'fare', 'deck_A', 'deck_B', 'deck_C', 'deck_D', 'deck_E', 'deck_F', 'deck_G', 'deck_None']
-            
-        df = df[features]
-        return df
+            features.append('survived')
+        return df[features]
 
     def scale_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        # Normalization
-        min_max_scaler = MinMaxScaler(feature_range=(0, 10))
-        col = 'fare'
-        df[col] = min_max_scaler.fit_transform(df[[col]])
+        """Normalize the 'fare' column to range [0, 10]."""
+        scaler = MinMaxScaler(feature_range=(0, 10))
+        df['fare'] = scaler.fit_transform(df[['fare']])
         return df
-    
-    def train_pipeline(self, df: pd.DataFrame, save_threshold=0.0) -> Optional[Tuple[pd.DataFrame, float, float]]:
 
-        print (f"save_threshold= {save_threshold}")
+    def train_pipeline(
+        self,
+        df: pd.DataFrame,
+        save_threshold: float = 0.0
+    ) -> Optional[Tuple[pd.DataFrame, float, float]]:
+        """Train the KNN model and log it to MLflow if criteria are met."""
+        print(f"save_threshold= {save_threshold}")
         df = self.cleaning_dataframe(df)
-        df, local_label_encoder_path = self.transform_data(df)
+        df, encoder_path = self.transform_data(df)
         df = self.select_features(df)
         df = self.scale_features(df)
 
@@ -223,7 +204,6 @@ class MLPersist:
 
         # random state is set for the reproducibility's sake 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30, random_state=0)
-
         neighbours = 5
         knn = KNeighborsClassifier(n_neighbors=neighbours)
         knn.fit(X_train, y_train)
@@ -234,41 +214,38 @@ class MLPersist:
         train_accuracy = accuracy_score(y_train, y_train_pred)
         test_accuracy = accuracy_score(y_test, y_test_pred)
         
-        self.save_artifact(df, neighbours, train_accuracy, test_accuracy, X_train, y_train, knn, save_threshold, local_label_encoder_path)
+        self.save_artifact(df, neighbours, train_accuracy, test_accuracy, X_train, y_train, knn, save_threshold, encoder_path)
 
         return (df, train_accuracy, test_accuracy)
     
 
     def preprocess_pipeline(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Prepare data for prediction."""
         df = self.cleaning_dataframe(df)
-        df, _ = self.transform_data(df, saveEncoders=False)
+        df, _ = self.transform_data(df, save_encoders=False)
         df = self.select_features(df, full=False)
-        df = self.scale_features(df)
-
-        return df
-
+        return self.scale_features(df)
 
     def predict(self, df: pd.DataFrame) -> Optional[pd.DataFrame]:
+        """Predict using the latest staged model."""
         try:
-            model_uri = f"models:/{MLPersist.MLFLOW_NAME}@{MLPersist.MLFLOW_ALIAS_STAGING}"
-            loaded_model = mlflow.sklearn.load_model(model_uri) 
- 
-            print(loaded_model)
-            y = loaded_model.predict(df)
-            predictions_df = pd.DataFrame(y, columns=['prediction'], index=df.index)
-            return predictions_df
+            model_uri = f"models:/{self.MLFLOW_NAME}@{self.MLFLOW_ALIAS_STAGING}"
+            model = mlflow.sklearn.load_model(model_uri)
+            predictions = model.predict(df)
+            return pd.DataFrame(predictions, columns=['prediction'], index=df.index)
         except Exception as e:
-            print(f"The model has probably not yet been trained. Train the model first! MLflow: Error loading model: {e}")
+            print(f"Prediction error: {e}")
             return None
 
     def test_predict(self, df_transformed: pd.DataFrame) -> Tuple[float, float]:
+        """Evaluate prediction accuracy using the staged model."""
         y = df_transformed["survived"]
         X = df_transformed.drop(columns="survived")
         # random state is set for the reproducibility's sake 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30, random_state=0)
 
-        y_train_pred = persist.predict(X_train)
-        y_test_pred = persist.predict(X_test)
+        y_train_pred = self.predict(X_train)['prediction']
+        y_test_pred = self.predict(X_test)['prediction']
 
         train_accuracy = accuracy_score(y_train, y_train_pred)
         test_accuracy = accuracy_score(y_test, y_test_pred)
@@ -280,7 +257,7 @@ if __name__ == "__main__":
     persist = MLPersist()
 
     file_url = 'https://raw.githubusercontent.com/mwaskom/seaborn-data/master/titanic.csv'
-    df=pd.read_csv(file_url)
+    df = pd.read_csv(file_url)
 
     df_t, _, _ = persist.train_pipeline(df.copy())
     persist.test_predict(df_t)
@@ -288,4 +265,3 @@ if __name__ == "__main__":
     df = df.drop(columns="survived")
     df = persist.preprocess_pipeline(df)
     print(persist.predict(df))
-

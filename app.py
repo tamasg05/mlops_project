@@ -1,55 +1,80 @@
 from flask import Flask, request, jsonify
 import pandas as pd
 import io
-from MLPersist import MLPersist
 
+from MLPersist import MLPersist
 
 app = Flask(__name__)
 persist = MLPersist()
 train_accuracy = 0
 test_accuracy = 0
 
+
 @app.route('/train_csv', methods=['POST'])
 def train_csv():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-    if file and file.filename.endswith('.csv'):
-        try:
-            csv_data = file.read().decode('utf-8')
-            df = pd.read_csv(io.StringIO(csv_data))
+    """
+    Train the KNN model using uploaded CSV data.
+    Expects a CSV file with 'survived' column.
+    """
+    file = request.files.get('file')
+    if file is None or file.filename == '':
+        return jsonify({'error': 'No file uploaded'}), 400
 
-            global train_accuracy, test_accuracy
-            _, train_accuracy, test_accuracy = persist.train_pipeline(df.copy(), test_accuracy)
+    if not file.filename.endswith('.csv'):
+        return jsonify({'error': 'Invalid file extension'}), 400
 
-            return jsonify({'success': True, 'message':'Model trained', 'test accuracy': test_accuracy})
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-    return jsonify({'error': 'Invalid file'}), 400
+    try:
+        csv_data = file.read().decode('utf-8')
+        df = pd.read_csv(io.StringIO(csv_data))
+
+        global train_accuracy, test_accuracy
+        _, train_accuracy, test_accuracy = persist.train_pipeline(
+            df.copy(), test_accuracy
+        )
+
+        return jsonify({
+            'success': True,
+            'message': 'Model trained',
+            'train_accuracy': train_accuracy,
+            'test_accuracy': test_accuracy
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/predict_csv', methods=['POST'])
 def predict_csv():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-    if file and file.filename.endswith('.csv'):
-        try:
-            csv_data = file.read().decode('utf-8')
-            df = pd.read_csv(io.StringIO(csv_data))
-            df_t = persist.preprocess_pipeline(df.copy())
-            y = persist.predict(df_t)
-            if y is None:
-                return jsonify({'error': 'The model is not available. Train the model first.'}), 400
+    """
+    Make predictions using uploaded CSV data.
+    Expects a CSV file *without* the 'survived' column.
+    """
+    file = request.files.get('file')
+    if file is None or file.filename == '':
+        return jsonify({'error': 'No file uploaded'}), 400
 
-            return jsonify({'success': True, 'predictions': y.to_dict(orient='records')})
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-    return jsonify({'error': 'Invalid file'}), 400
+    if not file.filename.endswith('.csv'):
+        return jsonify({'error': 'Invalid file extension'}), 400
+
+    try:
+        csv_data = file.read().decode('utf-8')
+        df = pd.read_csv(io.StringIO(csv_data))
+
+        df_t = persist.preprocess_pipeline(df.copy())
+        predictions = persist.predict(df_t)
+
+        if predictions is None:
+            return jsonify({
+                'error': 'The model is not available. Train the model first.'
+            }), 400
+
+        return jsonify({
+            'success': True,
+            'predictions': predictions.to_dict(orient='records')
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
-    # host="0.0.0.0" to listen on all interfaces
+    # host="0.0.0.0" allows access from external machines (to listen on all interfaces)
     app.run(debug=True, host="0.0.0.0", port=5001)
