@@ -40,7 +40,8 @@ class MLPersist:
 
     def save_artifact(
         self,
-        df: pd.DataFrame,
+        df_cleaned_transformed: pd.DataFrame,
+        df_orig: pd.DataFrame,
         neighbours: int,
         train_accuracy: float,
         test_accuracy: float,
@@ -51,9 +52,13 @@ class MLPersist:
         label_encoder_path: str
     ) -> None:
         """Save the model, encoders, and training data as MLflow artifacts."""
-        train_data_path = os.path.join(self.MODEL_FOLDER, "training_data.csv")
-        df.to_csv(train_data_path, index=False)
-        print(f"Temporary training data saved to: {train_data_path}")
+        clean_transformed_training_data_path = os.path.join(self.MODEL_FOLDER, "cleaned_transformed_training_data.csv")
+        df_cleaned_transformed.to_csv(clean_transformed_training_data_path, index=False)
+        print(f"Temporary cleaned, transformed training data saved to: {clean_transformed_training_data_path}")
+
+        orig_training_data_path = os.path.join(self.MODEL_FOLDER, "orig_training_data.csv")
+        df_orig.to_csv(orig_training_data_path, index=False)
+        print(f"Original training data saved to: {orig_training_data_path}")
 
         mlflow_client = mlflow.tracking.MlflowClient()
 
@@ -70,9 +75,22 @@ class MLPersist:
                 mlflow.log_metric("train_accuracy", train_accuracy)
                 mlflow.log_metric("test_accuracy", test_accuracy)
 
-                mlflow.log_input(mlflow.data.from_pandas(df), context="training")
-                mlflow.log_artifact(train_data_path, artifact_path="training_data")
+                # df_cleaned_transformed: Fixing schema warning for type inference: convert int columns to float64 to support NaNs
+                df_cleaned_transformed = df_cleaned_transformed.astype({
+                    col: 'float64' for col in df_cleaned_transformed.select_dtypes(include='int').columns
+                })
+                mlflow.log_input(mlflow.data.from_pandas(df_cleaned_transformed), context="training")
+                
+                mlflow.log_artifact(clean_transformed_training_data_path, artifact_path="training_data")
+                mlflow.log_artifact(orig_training_data_path, artifact_path="training_data")
                 mlflow.log_artifact(label_encoder_path, artifact_path=MLPersist.LABEL_ENCODER_FOLDER)
+
+                # X_train, y_train: Fixing schema warning for  type inference for infer_signature(): 
+                # converting int columns to float64 to support NaNs
+                X_train = X_train.astype({
+                    col: 'float64' for col in X_train.select_dtypes(include='int').columns
+                })
+                y_train = y_train.astype('float64')
 
                 signature = mlflow.models.infer_signature(X_train, y_train)
                 input_example = X_train.head(1)
@@ -191,6 +209,7 @@ class MLPersist:
         save_threshold: float = 0.0
     ) -> Optional[Tuple[pd.DataFrame, float, float]]:
         """Train the KNN model and log it to MLflow if criteria are met."""
+        df_orig = df.copy()
         print(f"save_threshold= {save_threshold}")
         df = self.cleaning_dataframe(df)
         df, encoder_path = self.transform_data(df)
@@ -214,7 +233,7 @@ class MLPersist:
         train_accuracy = accuracy_score(y_train, y_train_pred)
         test_accuracy = accuracy_score(y_test, y_test_pred)
         
-        self.save_artifact(df, neighbours, train_accuracy, test_accuracy, X_train, y_train, knn, save_threshold, encoder_path)
+        self.save_artifact(df, df_orig, neighbours, train_accuracy, test_accuracy, X_train, y_train, knn, save_threshold, encoder_path)
 
         return (df, train_accuracy, test_accuracy)
     

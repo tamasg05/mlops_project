@@ -29,7 +29,7 @@ def train_csv():
 
         global train_accuracy, test_accuracy
         _, train_accuracy, test_accuracy = persist.train_pipeline(
-            df.copy(), test_accuracy
+            df, test_accuracy
         )
 
         return jsonify({
@@ -59,8 +59,8 @@ def predict_csv():
         csv_data = file.read().decode('utf-8')
         df = pd.read_csv(io.StringIO(csv_data))
 
-        df_t = persist.preprocess_pipeline(df.copy())
-        predictions = persist.predict(df_t)
+        df = persist.preprocess_pipeline(df)
+        predictions = persist.predict(df)
 
         if predictions is None:
             return jsonify({
