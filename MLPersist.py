@@ -12,6 +12,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder
 from sklearn.neighbors import KNeighborsClassifier
 
+from evidently import Report
+from evidently.presets import DataDriftPreset
+
+
+
 
 class MLPersist:
     MODEL_FOLDER = "artifacts/"
@@ -19,11 +24,16 @@ class MLPersist:
     LABEL_ENCODER_FOLDER = "label_encoder_dictionary"
     MLFLOW_NAME = "Titanic_KNN_Model"
 
+    DRIFT_REPORT_PATH = MODEL_FOLDER + "data_drift_report.html"
+
     MLFLOW_ALIAS_STAGING = "Staging"
     MLFLOW_ALIAS_PRODUCTION = "Production"
     MLFLOW_ALIAS_TEST = "Test"
 
     def __init__(self):
+        
+        self.last_orig_df = None
+
         # Set up MLflow tracking
         mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"))
         experiment_name = "Titanic KNN classification tests"
@@ -37,6 +47,14 @@ class MLPersist:
             print(f"{MLPersist.MODEL_FOLDER} exists.")
         else:
             Path(MLPersist.MODEL_FOLDER).mkdir(parents=True, exist_ok=True)
+
+    def generate_data_drift_report(self, reference_df: pd.DataFrame, current_df: pd.DataFrame, output_path: str = DRIFT_REPORT_PATH):
+        report = Report(metrics=[DataDriftPreset()])
+        snapshot = report.run(reference_data=reference_df, current_data=current_df)
+        snapshot.save_html(output_path) 
+        print(f"Data drift report saved to {output_path}")
+        return output_path
+
 
     def save_artifact(
         self,
@@ -209,6 +227,10 @@ class MLPersist:
         save_threshold: float = 0.0
     ) -> Optional[Tuple[pd.DataFrame, float, float]]:
         """Train the KNN model and log it to MLflow if criteria are met."""
+
+        # keeping it for data drift check
+        self.last_orig_df = df.copy()
+
         df_orig = df.copy()
         print(f"save_threshold= {save_threshold}")
         df = self.cleaning_dataframe(df)
