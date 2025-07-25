@@ -32,8 +32,6 @@ class MLPersist:
 
     def __init__(self):
         
-        self.last_orig_df = None
-
         # Set up MLflow tracking
         mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"))
         experiment_name = "Titanic KNN classification tests"
@@ -55,7 +53,34 @@ class MLPersist:
         print(f"Data drift report saved to {output_path}")
         return output_path
 
+    def get_data_drift_summary(self, reference_df: pd.DataFrame, current_df: pd.DataFrame) -> dict:
+        """Generate a summary of data drift using Evidently and return drift details."""
+        report = Report(metrics=[DataDriftPreset()])
+        snapshot = report.run(reference_data=reference_df, current_data=current_df)
+        report_dict = snapshot.dict()
 
+        drifted_columns = []
+
+        for metric in report_dict.get("metrics", []):
+            if metric.get("metric_id", "").startswith("ValueDrift(column="):
+                # looking into 'result' -> 'drift_detected'
+                result = metric.get("result", {})
+                if result.get("drift_detected", False):
+                    column_name = metric["metric_id"].split("column=")[-1][:-1]
+                    drifted_columns.append(column_name)
+
+        share_drifted = None
+        for metric in report_dict.get("metrics", []):
+            if metric.get("metric_id", "").startswith("DriftedColumnsCount"):
+                share_drifted = metric.get("value", {}).get("share", None)
+                break
+
+        return {
+            "drifted_column_names": drifted_columns,
+            "drifted_columns": len(drifted_columns),
+            "share_drifted": share_drifted if share_drifted is not None else "n/a"
+        }
+    
     def save_artifact(
         self,
         df_cleaned_transformed: pd.DataFrame,
@@ -228,9 +253,6 @@ class MLPersist:
     ) -> Optional[Tuple[pd.DataFrame, float, float]]:
         """Train the KNN model and log it to MLflow if criteria are met."""
 
-        # keeping it for data drift check
-        self.last_orig_df = df.copy()
-
         df_orig = df.copy()
         print(f"save_threshold= {save_threshold}")
         df = self.cleaning_dataframe(df)
@@ -292,6 +314,37 @@ class MLPersist:
         test_accuracy = accuracy_score(y_test, y_test_pred)
         print(f"Train accuracy: {train_accuracy}, Test Accuracy: {test_accuracy}")
         return (train_accuracy, test_accuracy)
+
+    def load_last_training_dataframe_from_mlflow(self, label: str = MLFLOW_ALIAS_STAGING) -> pd.DataFrame:
+        """
+        Load the original training DataFrame from the MLflow model version 
+        aliased as 'Staging'.
+        """
+        try:
+            client = mlflow.tracking.MlflowClient()
+
+            # Get model version associated with alias 'Staging'
+            model_version = client.get_model_version_by_alias(
+                name=self.MLFLOW_NAME,
+                alias=label
+            )
+            run_id = model_version.run_id
+
+            # Path to original training CSV in MLflow artifacts
+            artifact_path = f"runs:/{run_id}/training_data/orig_training_data.csv"
+            print(f"Fetching original training data from: {artifact_path}")
+
+            # Download the file locally
+            local_path = mlflow.artifacts.download_artifacts(artifact_uri=artifact_path)
+
+            # Load as DataFrame
+            df = pd.read_csv(local_path)
+            print(f"Loaded original training DataFrame with shape: {df.shape}")
+            return df
+
+        except Exception as e:
+            print(f"Failed to load original training data from MLflow: {e}")
+            raise
 
 
 if __name__ == "__main__":

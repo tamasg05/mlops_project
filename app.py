@@ -90,15 +90,11 @@ def data_drift_csv():
         return jsonify({'error': 'Invalid file extension'}), 400
 
     try:
-        if persist.last_orig_df is None:
-            return jsonify({'error': 'No training data found. Train the model first.'}), 400
-
         csv_data = file.read().decode('utf-8')
         current_df = pd.read_csv(io.StringIO(csv_data))
 
         # Align columns before drift check
-        ## TODO taking it from MLFlow
-        reference_df = persist.last_orig_df.copy()
+        reference_df = persist.load_last_training_dataframe_from_mlflow()
         reference_df = persist.cleaning_dataframe(reference_df)
         reference_df, _ = persist.transform_data(reference_df, save_encoders=False)
         reference_df = persist.select_features(reference_df, full=False)
@@ -126,6 +122,42 @@ def get_report():
         return jsonify({'error': 'No report available. Run drift check first.'}), 404
 
     return send_file(MLPersist.DRIFT_REPORT_PATH, mimetype='text/html')
+
+@app.route('/data_drift_summary', methods=['POST'])
+def data_drift_summary():
+    """
+    Return a JSON summary of data drift between the uploaded CSV and 
+    the last staged training dataset.
+    """
+    file = request.files.get('file')
+    if file is None or file.filename == '':
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    if not file.filename.endswith('.csv'):
+        return jsonify({'error': 'Invalid file extension'}), 400
+
+    try:
+        csv_data = file.read().decode('utf-8')
+        current_df = pd.read_csv(io.StringIO(csv_data))
+
+        reference_df = persist.load_last_training_dataframe_from_mlflow()
+
+        # Align columns
+        reference_df = persist.cleaning_dataframe(reference_df)
+        reference_df, _ = persist.transform_data(reference_df, save_encoders=False)
+        reference_df = persist.select_features(reference_df, full=False)
+        reference_df = persist.scale_features(reference_df)
+
+        current_df = persist.cleaning_dataframe(current_df)
+        current_df, _ = persist.transform_data(current_df, save_encoders=False)
+        current_df = persist.select_features(current_df, full=False)
+        current_df = persist.scale_features(current_df)
+
+        summary = persist.get_data_drift_summary(reference_df, current_df)
+        return jsonify(summary)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # host="0.0.0.0" allows access from external machines (to listen on all interfaces)
