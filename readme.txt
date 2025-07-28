@@ -30,6 +30,7 @@ There are 4 git branches with different functionalities:
         this branch is the simplest approach just for training a model and storing it on the file system, 
         the prediction pipeline will use the model saved during the training. There is no model versioning, 
         aliasing and easy fallback; however, those can also be achieved with some tricks.
+
     (2) feature/mlflow
         this branch contains model versioning with MLFlow. In addition, each training stores the artifacts, 
         including training metrics, training data, model parameters, label encoders, and the trained model itself.
@@ -52,6 +53,7 @@ There are 4 git branches with different functionalities:
                 -Experiments
                 -Saving parameters, metrics and artifacts
                 -Model registration and aliasing
+    
     (3) feature/dockerized
         this branch contains a the application from feature/mlflow containerized that can be deployed in any docker compatible environment
         -You maybe have to change MLFlow's URL and port in MLPersist.py depending where you MLFlow runs.
@@ -76,7 +78,10 @@ There are 4 git branches with different functionalities:
             curl -X POST -F "file=@titanic_train500.csv" http://127.0.0.1:5001/train_csv
             the docker container will listen on the local 5001 port and the application will serve the request
 
-    (4) main
-        this branch contains the dockerized variant of the application and MLFlow is updated from 2.22.0 to 3.1.0 version. This upgrade required a couple of changes in the code.
+    (4) feature/datadrift_evidentlyai
+        This branch integrates EvidentlyAI to determine whether there is a data drift among the columns in the provided csv compared to the version that is labelled with @Staging in MLFlow, i.e. the last version used for training of the staged version. 2 REST end points were added: (a) /data_drift_report  (b) /data_drift_summary. The first generates a data drift report in html, and saves in in MLFlow under the artifacts, while the latter returns a summary of the data drift in JSON format. Both methods expect a csv file that will be compared to the one labelled with @Staging in MLflow.
+
+    (5) main
+        this branch contains all branches except (1) feature/simple, i.e the dockerized variant of the application, MLFlow updated from 2.22.0 to 3.1.0 version, and evidentlyAI library for data drift detection. The MLFlow upgrade required a couple of changes in the code.
 
         

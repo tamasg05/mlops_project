@@ -51,7 +51,26 @@ class MLPersist:
         snapshot = report.run(reference_data=reference_df, current_data=current_df)
         snapshot.save_html(output_path) 
         print(f"Data drift report saved to {output_path}")
+
+        self.log_data_drift_report(output_path)
         return output_path
+
+    def log_data_drift_report(self, report_path: str) -> None:
+        """
+        Log the data drift report HTML to MLflow, if it exists.
+        """
+        if not os.path.exists(report_path):
+            print(f"Drift report not found at: {report_path}")
+            return
+
+        try:
+            run_name = f"data_drift_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            with mlflow.start_run(run_name=run_name) as run:
+                mlflow.log_artifact(report_path, artifact_path="drift_report")
+                print(f"Data drift report logged to MLflow (run_id={run.info.run_id})")
+        except Exception as e:
+            print(f"Failed to log drift report: {e}")
+            raise
 
     def get_data_drift_summary(self, reference_df: pd.DataFrame, current_df: pd.DataFrame) -> dict:
         """Generate a summary of data drift using Evidently and return drift details."""
