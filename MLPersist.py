@@ -94,12 +94,41 @@ class MLPersist:
                 share_drifted = metric.get("value", {}).get("share", None)
                 break
 
-        return {
+        summary = {
             "drifted_column_names": drifted_columns,
             "drifted_columns": len(drifted_columns),
             "share_drifted": share_drifted if share_drifted is not None else "n/a"
         }
+        self.log_data_drift_summary(summary)
+        return summary
     
+    def log_data_drift_summary(self, summary: dict) -> None:
+        """
+        Logging the data drift summary metrics in MLFlow.
+        """
+        try:
+            run_name = f"data_drift_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            with mlflow.start_run(run_name=run_name) as run:
+                mlflow.log_metric("drifted_columns", summary.get("drifted_columns", 0))
+                
+                # Share can be float or "n/a"
+                share_drifted = summary.get("share_drifted", 0.0)
+                if isinstance(share_drifted, (int, float)):
+                    mlflow.log_metric("share_drifted", share_drifted)
+
+                # Log list of drifted columns as artifact (JSON or plain text)
+                drifted_cols_path = os.path.join(self.MODEL_FOLDER, "drifted_columns.txt")
+                with open(drifted_cols_path, "w", encoding="utf-8") as f:
+                    for col in summary.get("drifted_column_names", []):
+                        f.write(f"{col}\n")
+
+                mlflow.log_artifact(drifted_cols_path, artifact_path="drift_summary")
+                print(f"Data drift summary logged to MLflow (run_id={run.info.run_id})")
+
+        except Exception as e:
+            print(f"Failed to log drift summary: {e}")
+            raise
+
     def save_artifact(
         self,
         df_cleaned_transformed: pd.DataFrame,

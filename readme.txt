@@ -79,7 +79,12 @@ There are 4 git branches with different functionalities:
             the docker container will listen on the local 5001 port and the application will serve the request
 
     (4) feature/datadrift_evidentlyai
-        This branch integrates EvidentlyAI to determine whether there is a data drift among the columns in the provided csv compared to the version that is labelled with @Staging in MLFlow, i.e. the last version used for training of the staged version. 2 REST end points were added: (a) /data_drift_report  (b) /data_drift_summary. The first generates a data drift report in html, and saves in in MLFlow under the artifacts, while the latter returns a summary of the data drift in JSON format. Both methods expect a csv file that will be compared to the one labelled with @Staging in MLflow.
+        This branch integrates EvidentlyAI to determine whether there is a data drift among the columns in the provided csv compared to the version that is labelled with @Staging in MLFlow, i.e. the last version used for training of the staged version. 4 REST end points were added: 
+        (a) /data_drift_csv  - to generate the data drift report
+        (b) /data_drift_summary - to generate the drift summary in JSON format
+        (c) /auto_retrain_if_drifted - to retrain the model if the data drift exceeds a set threshold
+        (d) /data_drift_report - to send the report to the browser
+        The (a), (b), and (c) methods expect a csv file in the same structure as the csv file used for training. This file will be compared to the one labelled with @Staging in MLflow. 
 
     (5) main
         this branch contains all branches except (1) feature/simple, i.e the dockerized variant of the application, MLFlow updated from 2.22.0 to 3.1.0 version, and evidentlyAI library for data drift detection. The MLFlow upgrade required a couple of changes in the code.

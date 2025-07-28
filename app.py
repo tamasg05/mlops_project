@@ -3,8 +3,11 @@ from flask import send_file
 import pandas as pd
 import io
 import os
+from typing import Tuple
 
 from MLPersist import MLPersist
+
+RATIO_OF_DRIFTED_COLS = 0.3
 
 app = Flask(__name__)
 persist = MLPersist()
@@ -14,10 +17,6 @@ test_accuracy = 0
 
 @app.route('/train_csv', methods=['POST'])
 def train_csv():
-    """
-    Train the KNN model using uploaded CSV data.
-    Expects a CSV file with 'survived' column.
-    """
     file = request.files.get('file')
     if file is None or file.filename == '':
         return jsonify({'error': 'No file uploaded'}), 400
@@ -28,21 +27,9 @@ def train_csv():
     try:
         csv_data = file.read().decode('utf-8')
         df = pd.read_csv(io.StringIO(csv_data))
-
-        global train_accuracy, test_accuracy
-        _, train_accuracy, test_accuracy = persist.train_pipeline(
-            df, test_accuracy
-        )
-
-        return jsonify({
-            'success': True,
-            'message': 'Model trained',
-            'train_accuracy': train_accuracy,
-            'test_accuracy': test_accuracy
-        })
+        return jsonify(train_model_from_df(df))
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
 
 @app.route('/predict_csv', methods=['POST'])
 def predict_csv():
@@ -79,8 +66,10 @@ def predict_csv():
 @app.route('/data_drift_csv', methods=['POST'])
 def data_drift_csv():
     """
-    Detect data drift by comparing new data to last trained data.
-    Returns an Evidently HTML report.
+    The methods expects a csv file in the same structure as for training
+    and fetches the training data from MLFlow labelled with @Staging,
+    and computes the data drift based on that
+    and saves it as a local file and logs it in MLFlow. 
     """
     file = request.files.get('file')
     if file is None or file.filename == '':
@@ -93,18 +82,7 @@ def data_drift_csv():
         csv_data = file.read().decode('utf-8')
         current_df = pd.read_csv(io.StringIO(csv_data))
 
-        # Align columns before drift check
-        reference_df = persist.load_last_training_dataframe_from_mlflow()
-        reference_df = persist.cleaning_dataframe(reference_df)
-        reference_df, _ = persist.transform_data(reference_df, save_encoders=False)
-        reference_df = persist.select_features(reference_df, full=False)
-        reference_df = persist.scale_features(reference_df)
-
-        current_df = persist.cleaning_dataframe(current_df)
-        current_df, _ = persist.transform_data(current_df, save_encoders=False)
-        current_df = persist.select_features(current_df, full=False)
-        current_df = persist.scale_features(current_df)
-
+        reference_df, current_df = prepare_reference_and_current_df(persist, current_df)
         persist.generate_data_drift_report(reference_df, current_df)
 
         return jsonify({
@@ -118,6 +96,8 @@ def data_drift_csv():
 
 @app.route('/data_drift_report', methods=['GET'])
 def get_report():
+    """Shows the data drift report in a browser"""
+
     if not os.path.exists(MLPersist.DRIFT_REPORT_PATH):
         return jsonify({'error': 'No report available. Run drift check first.'}), 404
 
@@ -126,9 +106,12 @@ def get_report():
 @app.route('/data_drift_summary', methods=['POST'])
 def data_drift_summary():
     """
-    Return a JSON summary of data drift between the uploaded CSV and 
-    the last staged training dataset.
+    The methods expects a csv file in the same structure as for training
+    and fetches the training data from MLFlow labelled with @Staging,
+    and computes the data drift based
+    and sends back the summary. 
     """
+
     file = request.files.get('file')
     if file is None or file.filename == '':
         return jsonify({'error': 'No file uploaded'}), 400
@@ -140,24 +123,86 @@ def data_drift_summary():
         csv_data = file.read().decode('utf-8')
         current_df = pd.read_csv(io.StringIO(csv_data))
 
-        reference_df = persist.load_last_training_dataframe_from_mlflow()
-
-        # Align columns
-        reference_df = persist.cleaning_dataframe(reference_df)
-        reference_df, _ = persist.transform_data(reference_df, save_encoders=False)
-        reference_df = persist.select_features(reference_df, full=False)
-        reference_df = persist.scale_features(reference_df)
-
-        current_df = persist.cleaning_dataframe(current_df)
-        current_df, _ = persist.transform_data(current_df, save_encoders=False)
-        current_df = persist.select_features(current_df, full=False)
-        current_df = persist.scale_features(current_df)
-
+        reference_df, current_df = prepare_reference_and_current_df(persist, current_df)
         summary = persist.get_data_drift_summary(reference_df, current_df)
+
         return jsonify(summary)
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/auto_retrain_if_drifted', methods=['POST'])
+def auto_retrain_if_drifted():
+    """
+    Automatically triggers model retraining if data drift exceeds a defined threshold.
+    """
+
+    file = request.files.get('file')
+    if file is None or file.filename == '':
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    if not file.filename.endswith('.csv'):
+        return jsonify({'error': 'Invalid file extension'}), 400
+
+    try:
+        csv_data = file.read().decode('utf-8')
+        current_df = pd.read_csv(io.StringIO(csv_data))
+
+        reference_df, current_df_transformed = prepare_reference_and_current_df(persist, current_df.copy())
+        summary = persist.get_data_drift_summary(reference_df, current_df_transformed)
+
+        drift_ratio = summary.get("share_drifted", 0.0)
+        if isinstance(drift_ratio, str):  # handle "n/a"
+            drift_ratio = 0.0
+
+        if drift_ratio >= RATIO_OF_DRIFTED_COLS:
+            print(f"Drift ratio {drift_ratio:.2f} exceeded threshold. Retraining model.")
+            result = train_model_from_df(current_df)
+            result["retrained"] = True
+            result["drift_ratio"] = drift_ratio
+            return jsonify(result)
+        else:
+            return jsonify({
+                "success": True,
+                "message": "No retraining necessary. Drift below threshold.",
+                "retrained": False,
+                "drift_ratio": drift_ratio
+            })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+#------- Helper methods-----------------------------------------------------------
+def train_model_from_df(df: pd.DataFrame) -> dict:
+    """Helper to train the model from a DataFrame and return a JSON-like result."""
+    global train_accuracy, test_accuracy
+    _, train_accuracy, test_accuracy = persist.train_pipeline(df, test_accuracy)
+
+    return {
+        'success': True,
+        'message': 'Model trained',
+        'train_accuracy': train_accuracy,
+        'test_accuracy': test_accuracy
+    }
+
+def prepare_reference_and_current_df(persist: MLPersist, current_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Preprocess reference and current DataFrames for drift detection."""
+
+    reference_df = persist.load_last_training_dataframe_from_mlflow()
+    reference_df = persist.cleaning_dataframe(reference_df)
+    reference_df, _ = persist.transform_data(reference_df, save_encoders=False)
+    reference_df = persist.select_features(reference_df, full=False)
+    reference_df = persist.scale_features(reference_df)
+
+    current_df = current_df
+    current_df = persist.cleaning_dataframe(current_df)
+    current_df, _ = persist.transform_data(current_df, save_encoders=False)
+    current_df = persist.select_features(current_df, full=False)
+    current_df = persist.scale_features(current_df)
+
+    return reference_df, current_df
+
+
 
 if __name__ == '__main__':
     # host="0.0.0.0" allows access from external machines (to listen on all interfaces)
