@@ -83,9 +83,12 @@ There are 4 git branches with different functionalities:
         (a) /data_drift_csv  - to generate the data drift report
         (b) /data_drift_summary - to generate the drift summary in JSON format
         (c) /auto_retrain_if_drifted - to retrain the model if the data drift exceeds a set threshold
-        (d) /data_drift_report - to send the report to the browser
+        (d) /data_drift_report - to send the report to the browser (go to localhost:5001/data_drift_report in the browser)
         The (a), (b), and (c) methods expect a csv file in the same structure as the csv file used for training. This file will be compared to the one labelled with @Staging in MLflow. 
-
+            E.g.:
+            curl -X POST -F "file=@titanic_train500.csv" http://127.0.0.1:5001/data_drift_csv
+            curl -X POST -F "file=@titanic_train500.csv" http://127.0.0.1:5001/data_drift_summary
+            curl -X POST -F "file=@titanic_train500.csv" http://127.0.0.1:5001/auto_retrain_if_drifted
     (5) main
         this branch contains all branches except (1) feature/simple, i.e the dockerized variant of the application, MLFlow updated from 2.22.0 to 3.1.0 version, and evidentlyAI library for data drift detection. The MLFlow upgrade required a couple of changes in the code.
 
